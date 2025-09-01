@@ -294,8 +294,9 @@ export default function Home() {
       <TouchableOpacity
         style={styles.addButton}
         onPress={handleAddItem}
+        activeOpacity={0.8}
       >
-        <Ionicons name="add" size={28} color="#fff" />
+        <Ionicons name="add" size={28} color="#FFFFFF" />
       </TouchableOpacity>
 
       <AddItemModal visible={isAddModalVisible} onClose={handleCloseModal} onItemAdded={handleItemAdded} />
@@ -312,6 +313,7 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     backgroundColor: '#F6F7F9',
+    position: 'relative',
   },
   centerContainer: {
     flex: 1,
@@ -485,6 +487,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     gap: 16,
     paddingHorizontal: 16,
+    paddingBottom: 80,
   },
   categoriesTitle: {
     fontSize: 16,
@@ -500,10 +503,10 @@ const styles = StyleSheet.create({
   // Add Button (FAB)
   addButton: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
-    width: 48,
-    height: 48,
+    bottom: 130, // Increased from 16 to ensure visibility
+    right: 20,  // Increased from 16 for better visibility
+    width: 56,
+    height: 56,
     backgroundColor: '#ec4899', // Pink gradient approximation
     borderRadius: 24,
     alignItems: 'center',
@@ -515,6 +518,7 @@ const styles = StyleSheet.create({
     },
     shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 8,
+    elevation: 10,
+    zIndex: 1000,
   },
 });

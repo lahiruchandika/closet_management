@@ -17,9 +17,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import ReactDatePicker from 'react-datepicker';
-import DatePicker from 'react-native-date-picker';
-import 'react-datepicker/dist/react-datepicker.css'; 
+import DateTimePicker from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import ItemsPopUp from '@/components/itemsPopUp';
@@ -52,7 +50,7 @@ export default function Canvas() {
   const [saving, setSaving] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   const [datePickerVisible, setDatePickerVisible] = useState(false);
-  const [webDate, setWebDate] = useState<Date | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [cameFromCalendar, setCameFromCalendar] = useState(false);
   const [hasInitialized, setHasInitialized] = useState(false);
 
@@ -81,6 +79,7 @@ export default function Canvas() {
       if (hasPlannedDateParam) {
         // Always set the planned date from params
         setPlannedDate(incomingPlannedDate as string);
+        setSelectedDate(new Date(incomingPlannedDate as string));
         setCameFromCalendar(true);
 
         // Auto-open items popup if specified
@@ -100,6 +99,7 @@ export default function Canvas() {
         setDroppedItems([]);
         setOutfitName('');
         setOutfitOccasion('');
+        setSelectedDate(new Date());
       }
 
       if (!hasInitialized) {
@@ -133,21 +133,21 @@ export default function Canvas() {
       itemName: item.name,
       gestureState,
     });
-  
+
     if (!isAuthenticated) {
       Alert.alert('Authentication Required', 'Please log in to create outfits.');
       return;
     }
-  
+
     // Get screen dimensions
     const modalHeight = screenHeight * 0.5;
     const canvasArea = screenHeight - modalHeight;
-  
+
     // More lenient drag detection - check multiple conditions
     const wasDraggedUp = gestureState.translationY < -30; // Dragged up by 30px
     const isInCanvasArea = gestureState.absoluteY < canvasArea + 100; // More generous area
     const wasSignificantDrag = Math.abs(gestureState.translationX) > 20 || Math.abs(gestureState.translationY) > 20;
-  
+
     console.log('Drag analysis:', {
       modalHeight,
       canvasArea,
@@ -158,31 +158,34 @@ export default function Canvas() {
       wasSignificantDrag,
       shouldAddToCanvas: (wasDraggedUp || isInCanvasArea) && wasSignificantDrag,
     });
-  
+
     // Add item if it was dragged significantly upward OR into canvas area
     if ((wasDraggedUp || isInCanvasArea) && wasSignificantDrag) {
       const actualItemId = item._id || item.id || item.itemId;
-  
+
       if (!actualItemId) {
         Alert.alert('Error', 'Invalid item - missing database ID.');
         return;
       }
-  
+
       const itemIdString = String(actualItemId);
-  
+
       if (itemIdString === 'undefined' || itemIdString.includes('undefined')) {
         Alert.alert('Error', 'Item ID is invalid.');
         return;
       }
-  
+
       // Calculate position - prefer gesture position, fallback to center
       let dropX = gestureState.absoluteX || screenWidth / 2;
       let dropY = gestureState.absoluteY || canvasArea / 2;
-  
-      // Ensure item stays within canvas bounds
-      dropX = Math.max(30, Math.min(dropX - 60, screenWidth - 120)); // Adjusted for larger size
-      dropY = Math.max(30, Math.min(dropY - 60, canvasArea - 120)); // Adjusted for larger size
-  
+
+      // INCREASED ITEM SIZE - now 120x120 instead of 60x60
+      const itemSize = 120;
+      
+      // Ensure item stays within canvas bounds with new size
+      dropX = Math.max(10, Math.min(dropX - itemSize/2, screenWidth - itemSize - 10));
+      dropY = Math.max(10, Math.min(dropY - itemSize/2, canvasArea - itemSize - 10));
+
       const newItem: DroppedItem = {
         id: itemIdString + '_dropped_' + Date.now(),
         itemId: itemIdString,
@@ -190,25 +193,18 @@ export default function Canvas() {
         name: item.name,
         x: dropX,
         y: dropY,
-        width: 180, // Increased width
-        height: 180, // Increased height
+        width: itemSize,
+        height: itemSize,
         rotation: 0,
-        zIndex: Date.now(), // Use timestamp for unique z-index
+        zIndex: Date.now(),
       };
-  
+
       setDroppedItems((prev) => [...prev, newItem]);
       console.log('Item successfully added to canvas:', item.name, 'at position:', { x: dropX, y: dropY });
-  
-      // Optional: Show success feedback
-      // You can uncomment this for user feedback
-      // Alert.alert('Item Added', `${item.name} added to canvas!`);
     } else {
       console.log('Item drag did not meet criteria for adding to canvas');
-      // Optional: Show instruction feedback
-      // Alert.alert('Drag Upward', 'Drag items upward to the canvas area to add them to your outfit.');
     }
   };
-  
 
   const removeItem = (id: string) => {
     setDroppedItems((prev) => prev.filter((item) => item.id !== id));
@@ -269,8 +265,8 @@ export default function Canvas() {
           item: d.itemId,
           x: d.x,
           y: d.y,
-          width: d.width || 60,
-          height: d.height || 60,
+          width: d.width || 120,
+          height: d.height || 120,
           rotation: d.rotation || 0,
           zIndex: d.zIndex || 1,
         })),
@@ -323,16 +319,37 @@ export default function Canvas() {
     setCameFromCalendar(false);
   };
 
-  const handleDateChange = (selectedDate: Date) => {
-    const formattedDate = selectedDate.toISOString().split('T')[0];
-    setPlannedDate(formattedDate);
-    setDatePickerVisible(false);
+  // Fixed date picker handlers
+  const handleDatePickerOpen = () => {
+    try {
+      if (plannedDate) {
+        setSelectedDate(new Date(plannedDate));
+      } else {
+        setSelectedDate(new Date());
+      }
+      setDatePickerVisible(true);
+    } catch (error) {
+      console.error('Error opening date picker:', error);
+      setSelectedDate(new Date());
+      setDatePickerVisible(true);
+    }
   };
 
-  const handleWebDateChange = (date: Date | null) => {
+  const handleDateChange = (event: any, date?: Date) => {
+    if (Platform.OS === 'android') {
+      setDatePickerVisible(false);
+    }
+    
     if (date) {
+      setSelectedDate(date);
       const formattedDate = date.toISOString().split('T')[0];
       setPlannedDate(formattedDate);
+    }
+  };
+
+  const handleDateConfirm = () => {
+    if (Platform.OS === 'ios') {
+      setDatePickerVisible(false);
     }
   };
 
@@ -352,8 +369,8 @@ export default function Canvas() {
         onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
         onPanResponderRelease: (evt, gestureState) => {
           const canvasHeight = screenHeight * 0.5;
-          const finalX = Math.max(10, Math.min(item.x + gestureState.dx, screenWidth - item.width));
-          const finalY = Math.max(10, Math.min(item.y + gestureState.dy, canvasHeight - item.height));
+          const finalX = Math.max(10, Math.min(item.x + gestureState.dx, screenWidth - 130));
+          const finalY = Math.max(10, Math.min(item.y + gestureState.dy, canvasHeight - 130));
 
           updateItemPosition(item.id, finalX, finalY);
 
@@ -372,8 +389,6 @@ export default function Canvas() {
           {
             left: item.x,
             top: item.y,
-            width: item.width, // Use dynamic width
-            height: item.height, // Use dynamic height
             transform: [{ scale }],
           },
         ]}
@@ -479,7 +494,7 @@ export default function Canvas() {
           </View>
         </Modal>
 
-        {/* Save Modal */}
+        {/* Save Modal with Fixed Date Picker */}
         <Modal animationType="fade" transparent visible={saveModalVisible} onRequestClose={handleCancelSave}>
           <View style={styles.saveModalOverlay}>
             <View style={styles.saveModalContent}>
@@ -514,13 +529,7 @@ export default function Canvas() {
                 <View style={styles.datePickerRow}>
                   <TouchableOpacity
                     style={[styles.textInput, { flex: 1, justifyContent: 'center' }]}
-                    onPress={() => {
-                      if (Platform.OS === 'web') {
-                        setWebDate(plannedDate ? new Date(plannedDate) : new Date());
-                      } else {
-                        setDatePickerVisible(true);
-                      }
-                    }}
+                    onPress={handleDatePickerOpen}
                     disabled={saving}
                   >
                     <Text style={{ color: plannedDate ? '#000' : '#999' }}>
@@ -528,32 +537,29 @@ export default function Canvas() {
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    onPress={() => {
-                      if (Platform.OS === 'web') {
-                        setWebDate(plannedDate ? new Date(plannedDate) : new Date());
-                      } else {
-                        setDatePickerVisible(true);
-                      }
-                    }}
+                    onPress={handleDatePickerOpen}
                     disabled={saving}
                   >
                     <Ionicons name="calendar" size={24} color="#007AFF" style={styles.calendarIcon} />
                   </TouchableOpacity>
                 </View>
 
-                {Platform.OS !== 'web' && (
-                  <DatePicker
-                    modal
-                    open={datePickerVisible}
-                    date={plannedDate ? new Date(plannedDate) : new Date()}
-                    mode="date"
-                    onConfirm={handleDateChange}
-                    onCancel={() => setDatePickerVisible(false)}
-                  />
-                )}
-
-                {Platform.OS === 'web' && webDate && (
-                  <ReactDatePicker selected={webDate} onChange={handleWebDateChange} inline />
+                {/* Fixed Date Picker */}
+                {datePickerVisible && (
+                  <View style={styles.datePickerContainer}>
+                    <DateTimePicker
+                      value={selectedDate}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      onChange={handleDateChange}
+                      minimumDate={new Date()}
+                    />
+                    {Platform.OS === 'ios' && (
+                      <TouchableOpacity style={styles.dateConfirmButton} onPress={handleDateConfirm}>
+                        <Text style={styles.dateConfirmText}>Confirm</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
               </View>
 
@@ -659,8 +665,10 @@ const styles = StyleSheet.create({
   },
   droppedItem: {
     position: 'absolute',
+    width: 120,
+    height: 120,
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -674,17 +682,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   droppedItemImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 6,
+    width: 112,
+    height: 112,
+    borderRadius: 8,
   },
   removeButton: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    top: -10,
+    right: -10,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#FF3B30',
     justifyContent: 'center',
     alignItems: 'center',
@@ -694,23 +702,27 @@ const styles = StyleSheet.create({
   },
   add: {
     position: 'absolute',
-    bottom: 140,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#545454',
-    justifyContent: 'center',
+    bottom: 130, // Increased from 16 to ensure visibility
+    right: 20,  // Increased from 16 for better visibility
+    width: 56,
+    height: 56,
+    backgroundColor: '#ec4899', // Pink gradient approximation
+    borderRadius: 24,
     alignItems: 'center',
-    elevation: 5,
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 1000,
   },
   doneButton: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 130,
     left: 30,
     width: 60,
     height: 60,
@@ -749,7 +761,6 @@ const styles = StyleSheet.create({
     left: 12,
     zIndex: 20,
   },
-  // FIXED MODAL STYLES
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-end',
@@ -757,11 +768,10 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '100%',
-    height: '50%', // Half screen
+    height: '50%',
     backgroundColor: 'white',
     borderTopLeftRadius: 10,
     borderTopRightRadius: 10,
-    // NO padding or alignItems
   },
   closeButton: {
     position: 'absolute',
@@ -780,7 +790,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  // Save Modal Styles
   saveModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -793,6 +802,7 @@ const styles = StyleSheet.create({
     padding: 30,
     width: '85%',
     maxWidth: 400,
+    maxHeight: '80%',
   },
   saveModalTitle: {
     fontSize: 20,
@@ -818,6 +828,28 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     backgroundColor: '#f9f9f9',
+  },
+  datePickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  calendarIcon: {
+    marginLeft: 10,
+  },
+  datePickerContainer: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  dateConfirmButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  dateConfirmText: {
+    color: 'white',
+    fontWeight: '600',
   },
   saveModalButtons: {
     flexDirection: 'row',
@@ -857,12 +889,5 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
-  },
-  datePickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  calendarIcon: {
-    marginLeft: 10,
   },
 });
