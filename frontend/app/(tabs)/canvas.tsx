@@ -714,7 +714,7 @@ const styles = StyleSheet.create({
   },
   doneButton: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 130,
     left: 30,
     width: 60,
     height: 60,
