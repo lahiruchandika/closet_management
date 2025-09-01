@@ -6,7 +6,6 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { AuthProvider } from '../contexts/AuthContext';
 import AuthGuard from '../components/AuthGuard';
-import '../global.css'
 
 SplashScreen.preventAutoHideAsync();
 
