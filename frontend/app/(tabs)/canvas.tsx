@@ -694,19 +694,23 @@ const styles = StyleSheet.create({
   },
   add: {
     position: 'absolute',
-    bottom: 140,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#545454',
-    justifyContent: 'center',
+    bottom: 130, // Increased from 16 to ensure visibility
+    right: 20,  // Increased from 16 for better visibility
+    width: 56,
+    height: 56,
+    backgroundColor: '#ec4899', // Pink gradient approximation
+    borderRadius: 24,
     alignItems: 'center',
-    elevation: 5,
+    justifyContent: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 10,
+    zIndex: 1000,
   },
   doneButton: {
     position: 'absolute',
